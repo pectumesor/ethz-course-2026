@@ -64,7 +64,7 @@ def process_action(action: np.ndarray, jnt_range: np.ndarray) -> np.ndarray:
     Returns:
     - target_qpos: np.ndarray. Target joint positions to apply as control. Dimensionality: 1D array, Shape: (num_joints,).
     """
-    low, high = jnt_range[0], jnt_range[1]
+    low, high = jnt_range[:, 0], jnt_range[:, 1]
     mid = (high + low) / 2
     target_qpos = mid + ((high - low) / 2 ) * action
     return target_qpos
@@ -122,4 +122,19 @@ def get_obs(qpos: np.ndarray, ee_pos_w: np.ndarray, ee_rot_w: np.ndarray, base_p
 
     Hints: You can use the provided functions quat_mul, quat_conjugate, quat_normalize, rot_mat_to_quat for quaternion operations.
     """
+    w_rot_base = base_rot_w.T
+
+    ee_pos_base = w_rot_base @ (ee_pos_w - base_pos_w)
+    target_pos_base = w_rot_base @ (target_pos_w - base_pos_w)
+
+    ee_rot_base = w_rot_base @ ee_rot_w
+
+    ee_quat_base = quat_normalize(rot_mat_to_quat(ee_rot_base))
+
+    obs = np.concatenate([qpos,
+                          ee_pos_base,
+                          ee_quat_base,
+                          target_pos_base,
+                        ])
     
+    return obs
