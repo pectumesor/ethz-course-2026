@@ -21,7 +21,7 @@ def reset_robot(default_qpos: np.ndarray) -> np.ndarray:
     Returns:
     - reset_qpos: np.ndarray. The joint positions to reset the robot to. Dimensionality: 1D array, Shape: (num_joints,).
     """
-    noise = np.random.uniform(low=-0.5, high=0.5)
+    noise = np.random.uniform(low=-0.05, high=0.05, size=default_qpos.shape)
     return default_qpos + noise
     
 
@@ -49,7 +49,7 @@ def reset_target_position(base_pos: np.ndarray) -> np.ndarray:
     return base_pos + noise
 
 
-def process_action(action: np.ndarray, jnt_range: np.ndarray) -> np.ndarray:
+def process_action(action: np.ndarray, jnt_range: np.ndarray, qpos: np.ndarray, action_scale: float = 0.03) -> np.ndarray:
     """
     TODO: Convert normalized actions [-1, 1] to target joint positions.
     
@@ -65,12 +65,17 @@ def process_action(action: np.ndarray, jnt_range: np.ndarray) -> np.ndarray:
     - target_qpos: np.ndarray. Target joint positions to apply as control. Dimensionality: 1D array, Shape: (num_joints,).
     """
     low, high = jnt_range[:, 0], jnt_range[:, 1]
-    mid = (high + low) / 2
-    target_qpos = mid + ((high - low) / 2 ) * action
+
+    delta = action_scale * action # Defines the maximum joint step per 0.1s (PID runs at 10Hz)
+
+    target_qpos = np.clip(qpos + delta, low, high) # Keeps new updated joint at correct boundary
     return target_qpos
 
 
-def compute_reward(ee_tracking_error: float) -> float:
+def compute_reward(ee_tracking_error: float,
+                   prev_ee_tracking_error: float,
+
+) -> float:
     """
     TODO: 
     Calculate the reward based on the distance (error) to the target. 
@@ -90,13 +95,24 @@ def compute_reward(ee_tracking_error: float) -> float:
     Returns:
     - reward: float. The computed reward based on the tracking error. Dimensionality: scalar
     """
+
+    progress_reward = 10.0 * (prev_ee_tracking_error - ee_tracking_error) # incentives to reducing error and not staying at good enough regions
+
     dense_reward = np.exp(-2 * ee_tracking_error)
+
     sparse_reward = 1.0 if ee_tracking_error < 0.005 else 0.0
-    reward = dense_reward + sparse_reward
+    
+    small_penalty = -0.01 # helps converging to good states faster
+
+    reward = dense_reward + sparse_reward + progress_reward + small_penalty
     return reward
 
 
-def get_obs(qpos: np.ndarray, ee_pos_w: np.ndarray, ee_rot_w: np.ndarray, base_pos_w: np.ndarray, base_rot_w: np.ndarray, target_pos_w: np.ndarray) -> np.ndarray:
+def get_obs(qpos: np.ndarray, ee_pos_w: np.ndarray, 
+            ee_rot_w: np.ndarray, base_pos_w: np.ndarray, base_rot_w: np.ndarray,
+            target_pos_w: np.ndarray,
+            qvel: np.ndarray,
+            prev_action: np.ndarray = None) -> np.ndarray:
     """
     TODO: Extract the observation vector from the environment robot state variables. 
 
@@ -131,10 +147,18 @@ def get_obs(qpos: np.ndarray, ee_pos_w: np.ndarray, ee_rot_w: np.ndarray, base_p
 
     ee_quat_base = quat_normalize(rot_mat_to_quat(ee_rot_base))
 
-    obs = np.concatenate([qpos,
-                          ee_pos_base,
-                          ee_quat_base,
-                          target_pos_base,
-                        ])
-    
-    return obs
+    rel_target_pos = target_pos_base - ee_pos_base
+
+    # qvel lets RL policy know how fast we are moving to avoid overshooting
+
+    # rel_target_pos helps RL policy to show where should it move to. Incentives reaching every keypoint
+
+    obs_parts = [qpos,qvel,
+                ee_pos_base,
+                ee_quat_base,target_pos_base, rel_target_pos ]
+
+    if prev_action is not None:
+        obs_parts.append(prev_action)
+
+
+    return np.concatenate(obs_parts)
