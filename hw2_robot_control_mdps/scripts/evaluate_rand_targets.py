@@ -7,7 +7,7 @@ from stable_baselines3 import PPO
 
 from __init__ import *
 from env.so100_tracking_env import SO100TrackEnv
-from exercises.ex3 import reset_robot, reset_target_position
+from exercises.ex3_bonus import reset_robot, reset_target_position
 
 
 def parse_args():

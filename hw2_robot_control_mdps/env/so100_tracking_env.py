@@ -5,7 +5,7 @@ import mujoco.viewer
 import gymnasium as gym
 from gymnasium import spaces
 
-from exercises.ex3 import *
+from exercises.ex3_bonus import *
 
 class SO100TrackEnv(gym.Env):
     xml_path: Path
