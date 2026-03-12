@@ -1,6 +1,7 @@
 .gitignore
 Installation_Guide.md
 README.md
+Theoretical_Questions.md
 pyproject.toml
 requirements.txt
 env/so100_tracking_env.py

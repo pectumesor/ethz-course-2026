@@ -21,10 +21,9 @@ def reset_robot(default_qpos: np.ndarray) -> np.ndarray:
     Returns:
     - reset_qpos: np.ndarray. The joint positions to reset the robot to. Dimensionality: 1D array, Shape: (num_joints,).
     """
-    noise = np.random.uniform(low=-0.5, high=0.5)
+    noise = np.random.uniform(low=-0.5, high=0.5, size=default_qpos.shape)
     return default_qpos + noise
     
-
 
 def reset_target_position(base_pos: np.ndarray) -> np.ndarray:
     """
