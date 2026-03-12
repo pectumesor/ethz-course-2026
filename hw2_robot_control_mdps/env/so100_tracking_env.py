@@ -17,7 +17,6 @@ class SO100TrackEnv(gym.Env):
         self.data = mujoco.MjData(self.model)
 
         # Previous metrics
-        self.prev_ee_tracking_error = 0.0
         self.prev_action = np.zeros(6)
 
         # Define Observation and Action Spaces
@@ -56,13 +55,9 @@ class SO100TrackEnv(gym.Env):
         base_pos = self.data.body("Base").xpos.copy()
         self.data.mocap_pos[0] = reset_target_position(base_pos)
 
-        self.ee_tracking_error = np.linalg.norm(
-            self.data.site("ee_site").xpos - self.data.mocap_pos[0]
-        )
-        self.prev_ee_tracking_error = self.ee_tracking_error
         self.prev_action = np.zeros(6, dtype=np.float32)
-
         self.current_step = 0
+
         return self._get_obs(), {}
 
     def _process_action(self, action):
@@ -70,8 +65,7 @@ class SO100TrackEnv(gym.Env):
         return process_action(action, self.model.jnt_range, qpos)
 
     def compute_reward(self):
-        return compute_reward(ee_tracking_error=self.ee_tracking_error,
-                                prev_ee_tracking_error=self.prev_ee_tracking_error)
+        return compute_reward(ee_tracking_error=self.ee_tracking_error)
 
     def step(self, action):
         self.data.ctrl[:] = self._process_action(action)
@@ -81,7 +75,6 @@ class SO100TrackEnv(gym.Env):
 
         reward = self.compute_reward()
 
-        self.prev_ee_tracking_error = self.ee_tracking_error
         self.prev_action = action.copy()
 
         terminated = False
@@ -100,13 +93,13 @@ class SO100TrackEnv(gym.Env):
 
     def _get_obs(self):
         qpos = self.data.qpos.flat[:].copy()
-        qval = self.data.qvel.flat[:6].copy()
+        qvel = self.data.qvel.flat[:6].copy()
         ee_pos_w = self.data.site("ee_site").xpos.copy()
         ee_rot_w = self.data.site("ee_site").xmat.reshape(3, 3)
         base_pos_w = self.data.body("Base").xpos.copy()
         base_rot_w = self.data.body("Base").xmat.reshape(3, 3)
         target_pos_w = self.data.mocap_pos[0].copy()        
-        return get_obs(qpos, ee_pos_w, ee_rot_w, base_pos_w, base_rot_w, target_pos_w, qval, self.prev_action)
+        return get_obs(qpos, ee_pos_w, ee_rot_w, base_pos_w, base_rot_w, target_pos_w, qvel, self.prev_action)
 
     def render(self):
         if self.render_mode != "human":

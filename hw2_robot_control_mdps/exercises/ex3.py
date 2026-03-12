@@ -72,10 +72,7 @@ def process_action(action: np.ndarray, jnt_range: np.ndarray, qpos: np.ndarray, 
     return target_qpos
 
 
-def compute_reward(ee_tracking_error: float,
-                   prev_ee_tracking_error: float,
-
-) -> float:
+def compute_reward(ee_tracking_error: float) -> float:
     """
     TODO: 
     Calculate the reward based on the distance (error) to the target. 
@@ -96,15 +93,12 @@ def compute_reward(ee_tracking_error: float,
     - reward: float. The computed reward based on the tracking error. Dimensionality: scalar
     """
 
-    progress_reward = 10.0 * (prev_ee_tracking_error - ee_tracking_error) # incentives to reducing error and not staying at good enough regions
-
     dense_reward = np.exp(-2 * ee_tracking_error)
 
     sparse_reward = 1.0 if ee_tracking_error < 0.005 else 0.0
-    
-    small_penalty = -0.01 # helps converging to good states faster
 
-    reward = dense_reward + sparse_reward + progress_reward + small_penalty
+    reward = dense_reward + sparse_reward
+
     return reward
 
 
@@ -155,7 +149,9 @@ def get_obs(qpos: np.ndarray, ee_pos_w: np.ndarray,
 
     obs_parts = [qpos,qvel,
                 ee_pos_base,
-                ee_quat_base,target_pos_base, rel_target_pos ]
+                ee_quat_base,target_pos_base, rel_target_pos]
+
+    # Passing the previous action to the observation gives the model a slight 
 
     if prev_action is not None:
         obs_parts.append(prev_action)
