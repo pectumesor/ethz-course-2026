@@ -28,26 +28,46 @@ from hw3.model import BasePolicy, build_policy
 from torch.utils.data import DataLoader, random_split
 
 # TODO: Choose your own hyperparameters!
-EPOCHS = ... 
-BATCH_SIZE = ...
-LR = ...
+EPOCHS = 150
+BATCH_SIZE = 256
+LR = 3e-4
 VAL_SPLIT = 0.1
-
-
+D_MODEL = 1024
+DEPTH = 3
 def train_one_epoch(
     model: BasePolicy,
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
-    device: torch.device,
+    device: torch.device
 ) -> float:
     model.train()
     total_loss = 0.0
     n_batches = 0
 
+    noise_std = 0.006
+
+    cubes_and_goal_xy = [7,8,10,11,13,14,16,17] 
+
     for batch in loader:
         states, action_chunks = batch
         # TODO: Implement the training step for one batch here.
         # This mostly: Get states and action_chunks onto the correct device, compute the loss, and step the optimizer.
+        states = states.to(device)
+        action_chunks = action_chunks.to(device)
+
+        noise = torch.randn(states.size(0), len(cubes_and_goal_xy), device=device) * noise_std
+
+        states[:, cubes_and_goal_xy] += noise
+
+        optimizer.zero_grad()
+
+        loss = model.compute_loss(states, action_chunks) 
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+        n_batches += 1
+
 
     return total_loss / max(n_batches, 1)
 
@@ -65,6 +85,13 @@ def evaluate(
     for batch in loader:
         states, action_chunks = batch
         # TODO: Implement the evaluation step for one batch here.
+        states = states.to(device)
+        action_chunks = action_chunks.to(device)
+        loss = model.compute_loss(states, action_chunks)
+        
+
+        n_batches += 1
+        total_loss += loss.item()
 
     return total_loss / max(n_batches, 1)
 
@@ -104,10 +131,13 @@ def main() -> None:
         "If omitted, uses the action_key attribute from the zarr metadata.",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
+
+    parser.add_argument("--extra_zarr", type=Path, nargs="*", default=[], help= "Optional if referencing my datasets")
+
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Device: {device}")
 
     # ── load data ─────────────────────────────────────────────────────
@@ -160,6 +190,9 @@ def main() -> None:
         state_dim=states.shape[1],
         action_dim=actions.shape[1],
         # TODO: build with your desired specifications
+        chunk_size = args.chunk_size,
+        d_model = D_MODEL,
+        depth=DEPTH
     ).to(device)
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -168,6 +201,8 @@ def main() -> None:
     # TODO: implement an optimizer and scheduler
     # optimizer =
     # scheduler =
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=LR)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer, eta_min=1e-5, T_max=EPOCHS)
 
     # ── training loop ─────────────────────────────────────────────────
     best_val = float("inf")
@@ -223,6 +258,8 @@ def main() -> None:
                     "state_dim": int(states.shape[1]),
                     "action_dim": int(actions.shape[1]),
                     "val_loss": val_loss,
+                    "d_model": D_MODEL,
+                    "depth": DEPTH
                 },
                 save_path,
             )

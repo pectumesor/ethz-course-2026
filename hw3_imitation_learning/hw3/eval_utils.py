@@ -114,8 +114,10 @@ def load_checkpoint(
         action_std=np.asarray(norm_data["action_std"], dtype=np.float32),
     )
 
-    d_model = int(ckpt.get("d_model", 128))
-    depth = int(ckpt.get("depth", 2))
+    #d_model = int(ckpt.get("d_model", 128))
+    #depth = int(ckpt.get("depth", 2))
+    d_model = ckpt["d_model"]
+    depth = ckpt["depth"]
     policy_type = str(ckpt.get("policy_type", "obstacle"))
     model = build_policy(
         policy_type,
@@ -123,7 +125,7 @@ def load_checkpoint(
         action_dim=action_dim,
         chunk_size=chunk_size,
         d_model=d_model,
-        depth=depth,
+        depth=depth
     )
     model.load_state_dict(ckpt["model_state_dict"])
     model.to(device)
