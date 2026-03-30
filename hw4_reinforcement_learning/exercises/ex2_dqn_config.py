@@ -13,10 +13,10 @@ Please keep the remaining parameters unchanged unless explicitly stated.
 DQN_PARAMETERS = {
     # TODO: Tune the following hyperparameters
     # Replace the default values with your own choices.
-    "lr": 3e-4,            # TODO
-    "epsilon": 0.2,       # TODO
-    "target_update": 2,   # TODO
-    "hidden_dim": 256,     # TODO
+    "lr": 1e-3,            # TODO
+    "epsilon": 0.03,       # TODO
+    "target_update": 10,   # TODO
+    "hidden_dim": 128,     # TODO
     
     # Fixed parameters
     "gamma": 0.99,
